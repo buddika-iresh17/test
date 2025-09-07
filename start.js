@@ -1389,11 +1389,7 @@ conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
             }
 
 //================OWNER REACT==============
-if (senderNumber.includes("94721551183") && !isReact) {
-  const reactions = ["👑", "💀", "📊", "⚙️", "🧠", "🎯", "📈", "📝", "🏆", "🌍", "🇱🇰", "💗", "❤️", "💥", "🌼", "🏵️","💐", "🔥", "❄️", "🌝", "🌚", "🐥", "🧊"];
-  const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
-  m.react(randomReaction);
-}
+
 //======
 //==========PUBLIC REACT============//
 // Auto React for all messages (public and owner)
@@ -1797,13 +1793,15 @@ ${CREATER}`;
 //
 
 
+
+
 cmd({
   pattern: "song2",
   desc: "Download songs with poll selection.",
   category: "download",
   react: "🎧",
   filename: __filename,
-}, async (m, conn, quoted, { from, reply, q }) => {
+}, async (m, sock, quoted, { from, reply, q }) => {
   try {
     if (!q) return reply("❌ *Please give me url or title*");
 
@@ -1833,7 +1831,7 @@ cmd({
 *Select Download Format:*`;
 
     // 📌 Send Poll message
-    const pollMsg = await conn.sendMessage(from, {
+    const pollMsg = await sock.sendMessage(from, {
       image: { url: song.thumbnail },
       caption,
       poll: {
@@ -1844,7 +1842,7 @@ cmd({
     }, { quoted });
 
     // 📨 Listen for poll response
-    conn.ev.on("messages.upsert", async (u) => {
+    sock.ev.on("messages.upsert", async (u) => {
       try {
         const ms = u.messages[0];
         if (!ms.message?.pollUpdateMessage) return;
@@ -1859,19 +1857,19 @@ cmd({
 
         switch (option) {
           case ".audio 🎶":
-            await conn.sendMessage(from, {
+            await sock.sendMessage(from, {
               audio: { url: dlLink },
               mimetype: "audio/mpeg",
-            }, { quoted });
+            }, { quoted: m });
             break;
 
           case ".document 📂":
-            await conn.sendMessage(from, {
+            await sock.sendMessage(from, {
               document: { url: dlLink },
               mimetype: "audio/mpeg",
               fileName: `${song.title}.mp3`,
               caption: `${CREATER}`,
-            }, { quoted });
+            }, { quoted: m });
             break;
 
           default:
@@ -1883,7 +1881,7 @@ cmd({
     });
 
   } catch (e) {
-    console.log(e);
+    console.log("Song Command Error:", e);
     reply(`❌ Error: ${e.message}`);
   }
 });
