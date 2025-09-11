@@ -1791,13 +1791,18 @@ ${CREATER}`;
   }
 );
 //
+const yts = require("yt-search");
+const ddownr = require("denethdev-ytmp3");
+const { cmd } = require("../command");
+const config = require("../config");
+
 cmd({
-  pattern: "song",
+  pattern: "song2",
   desc: "Download songs.",
   category: "download",
   react: "🎧",
   filename: __filename,
-}, async (conn, m, quoted, { from, reply, q }) => {
+}, async (sock, m, quoted, { from, reply, q }) => {
   try {
     if (!q) return reply("❌ *Please give me url or title*");
 
@@ -1838,7 +1843,7 @@ ${CREATER}`;
       headerType: 4,
     };
 
-    await conn.sendMessage(from, buttonMsg, { quoted: m });
+    await sock.sendMessage(from, buttonMsg, { quoted: m });
 
   } catch (e) {
     console.log("Song Command Error:", e);
@@ -1847,29 +1852,29 @@ ${CREATER}`;
 });
 
 // Handle button responses
-    if (m.message?.buttonsResponseMessage) {
-      const buttonId = m.message.buttonsResponseMessage.selectedButtonId;
+cmd({ on: "message" }, async (sock, m, quoted, { from }) => {
+  if (m.message?.buttonsResponseMessage) {
+    const buttonId = m.message.buttonsResponseMessage.selectedButtonId;
 
-      if (buttonId.startsWith("song_audio_")) {
-        const url = buttonId.replace("song_audio_", "");
-        await conn.sendMessage(from, {
-          audio: { url },
-          mimetype: "audio/mpeg",
-        }, { quoted: m });
-      }
-
-      if (buttonId.startsWith("song_doc_")) {
-        const url = buttonId.replace("song_doc_", "");
-        await conn.sendMessage(from, {
-          document: { url },
-          mimetype: "audio/mpeg",
-          fileName: "song.mp3",
-          caption: `${CREATER}`,
-        }, { quoted: m });
-      }
+    if (buttonId.startsWith("song_audio_")) {
+      const url = buttonId.replace("song_audio_", "");
+      await sock.sendMessage(from, {
+        audio: { url },
+        mimetype: "audio/mpeg",
+      }, { quoted: m });
     }
-  });
 
+    if (buttonId.startsWith("song_doc_")) {
+      const url = buttonId.replace("song_doc_", "");
+      await sock.sendMessage(from, {
+        document: { url },
+        mimetype: "audio/mpeg",
+        fileName: "song.mp3",
+        caption: `${CREATER}`,
+      }, { quoted: m });
+    }
+  }
+});
 //============ video download ================
 
 cmd({
