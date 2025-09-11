@@ -1791,10 +1791,6 @@ ${CREATER}`;
   }
 );
 //
-const yts = require("yt-search");
-const ddownr = require("denethdev-ytmp3");
-const { cmd } = require("../command");
-const config = require("../config");
 
 cmd({
   pattern: "song2",
