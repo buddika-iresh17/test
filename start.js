@@ -1791,10 +1791,6 @@ ${CREATER}`;
   }
 );
 //
-
-
-
-
 cmd({
   pattern: "song2",
   desc: "Download songs with poll selection.",
@@ -1805,7 +1801,7 @@ cmd({
   try {
     if (!q) return reply("❌ *Please give me url or title*");
 
-    // 🔍 Search YouTube
+    // 🔍 YouTube search
     const search = await yts(q);
     if (!search.videos || search.videos.length === 0) {
       return reply("❌ *No Song Found Matching Your Query*");
@@ -1818,8 +1814,10 @@ cmd({
     const result = await ddownr.download(url, "mp3");
     const dlLink = result.downloadUrl;
 
-    // 📄 Song details caption
-    let caption = `🎵 *${BOT} SONG DOWNLOAD*
+    // 🖼 Song Details Message
+    await sock.sendMessage(from, {
+      image: { url: song.thumbnail },
+      caption: `🎵 *${BOT} SONG DOWNLOAD*
 
 🎶 *Title:* ${song.title}
 ⏳ *Duration:* ${song.timestamp}
@@ -1828,18 +1826,21 @@ cmd({
 🖊 *Author:* ${song.author.name}
 🔗 *Watch Now:* ${song.url}
 
-*Select Download Format:*`;
-
-    // 📌 Send Poll message
-    const pollMsg = await sock.sendMessage(from, {
-      image: { url: song.thumbnail },
-      caption,
-      poll: {
-        name: "Select one option",
-        values: [".audio 🎶", ".document 📂"],
-        selectableCount: 1,
-      },
+*Select Download Format Below 👇*`,
     }, { quoted });
+
+    // 📌 Send Poll
+    const pollMsg = await sock.sendMessage(
+      from,
+      {
+        poll: {
+          name: "Select one option",
+          values: [".audio 🎶", ".document 📂"],
+          selectableCount: 1,
+        },
+      },
+      { quoted }
+    );
 
     // 📨 Listen for poll response
     sock.ev.on("messages.upsert", async (u) => {
@@ -1847,7 +1848,7 @@ cmd({
         const ms = u.messages[0];
         if (!ms.message?.pollUpdateMessage) return;
 
-        // ✅ Check if this poll is the same poll we sent
+        // ✅ Check if this poll is same poll we sent
         if (ms.message.pollUpdateMessage.pollCreationMessageKey.id !== pollMsg.key.id) return;
 
         const selected = ms.message.pollUpdateMessage.vote?.selectedOption || [];
@@ -1860,7 +1861,8 @@ cmd({
             await sock.sendMessage(from, {
               audio: { url: dlLink },
               mimetype: "audio/mpeg",
-            }, { quoted: m });
+              fileName: `${song.title}.mp3`,
+            }, { quoted });
             break;
 
           case ".document 📂":
@@ -1869,7 +1871,7 @@ cmd({
               mimetype: "audio/mpeg",
               fileName: `${song.title}.mp3`,
               caption: `${CREATER}`,
-            }, { quoted: m });
+            }, { quoted });
             break;
 
           default:
@@ -1881,7 +1883,7 @@ cmd({
     });
 
   } catch (e) {
-    console.log("Song Command Error:", e);
+    console.log(e);
     reply(`❌ Error: ${e.message}`);
   }
 });
