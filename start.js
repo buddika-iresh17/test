@@ -1792,101 +1792,84 @@ ${CREATER}`;
 );
 //
 cmd({
-  pattern: "song2",
-  desc: "Download songs with poll selection.",
+  pattern: "song",
+  desc: "Download songs.",
   category: "download",
   react: "🎧",
   filename: __filename,
-}, async (m, sock, quoted, { from, reply, q }) => {
+}, async (conn, m, quoted, { from, reply, q }) => {
   try {
     if (!q) return reply("❌ *Please give me url or title*");
 
-    // 🔍 YouTube search
-    const search = await yts(q);
-    if (!search.videos || search.videos.length === 0) {
+    // Search song
+    const searchResults = await yts(q);
+    if (!searchResults || searchResults.videos.length === 0) {
       return reply("❌ *No Song Found Matching Your Query*");
     }
 
-    const song = search.videos[0];
-    const url = song.url;
+    const songData = searchResults.videos[0];
+    const songUrl = songData.url;
 
-    // 🎶 fetch mp3 download link
-    const result = await ddownr.download(url, "mp3");
-    const dlLink = result.downloadUrl;
+    // Fetch download link
+    const result = await ddownr.download(songUrl, "mp3");
+    const downloadLink = result.downloadUrl;
 
-    // 🖼 Song Details Message
-    await sock.sendMessage(from, {
-      image: { url: song.thumbnail },
-      caption: `🎵 *${BOT} SONG DOWNLOAD*
+    // Caption
+    let caption = `*${BOT} SONG DOWNLOAD* 🎵
+    
+🎵 *Title:* ${songData.title}
+⏳ *Duration:* ${songData.timestamp}
+📊 *Views:* ${songData.views}
+📅 *Uploaded:* ${songData.ago}
+🖊 *Author:* ${songData.author.name}
+🔗 *Watch Now:* ${songData.url}
 
-🎶 *Title:* ${song.title}
-⏳ *Duration:* ${song.timestamp}
-📊 *Views:* ${song.views}
-📅 *Uploaded:* ${song.ago}
-🖊 *Author:* ${song.author.name}
-🔗 *Watch Now:* ${song.url}
+${CREATER}`;
 
-*Select Download Format Below 👇*`,
-    }, { quoted });
+    // Send buttons
+    const buttonMsg = {
+      image: { url: songData.thumbnail },
+      caption,
+      footer: "🎶 Choose a format",
+      buttons: [
+        { buttonId: `song_audio_${downloadLink}`, buttonText: { displayText: "🎶 Audio File" }, type: 1 },
+        { buttonId: `song_doc_${downloadLink}`, buttonText: { displayText: "📂 Document File" }, type: 1 },
+      ],
+      headerType: 4,
+    };
 
-    // 📌 Send Poll
-    const pollMsg = await sock.sendMessage(
-      from,
-      {
-        poll: {
-          name: "Select one option",
-          values: [".audio 🎶", ".document 📂"],
-          selectableCount: 1,
-        },
-      },
-      { quoted }
-    );
-
-    // 📨 Listen for poll response
-    sock.ev.on("messages.upsert", async (u) => {
-      try {
-        const ms = u.messages[0];
-        if (!ms.message?.pollUpdateMessage) return;
-
-        // ✅ Check if this poll is same poll we sent
-        if (ms.message.pollUpdateMessage.pollCreationMessageKey.id !== pollMsg.key.id) return;
-
-        const selected = ms.message.pollUpdateMessage.vote?.selectedOption || [];
-        if (!selected.length) return;
-
-        const option = selected[0]; // User choice
-
-        switch (option) {
-          case ".audio 🎶":
-            await sock.sendMessage(from, {
-              audio: { url: dlLink },
-              mimetype: "audio/mpeg",
-              fileName: `${song.title}.mp3`,
-            }, { quoted });
-            break;
-
-          case ".document 📂":
-            await sock.sendMessage(from, {
-              document: { url: dlLink },
-              mimetype: "audio/mpeg",
-              fileName: `${song.title}.mp3`,
-              caption: `${CREATER}`,
-            }, { quoted });
-            break;
-
-          default:
-            reply("❌ *Invalid Option Selected*");
-        }
-      } catch (err) {
-        console.log("Poll Error:", err);
-      }
-    });
+    await conn.sendMessage(from, buttonMsg, { quoted: m });
 
   } catch (e) {
-    console.log(e);
+    console.log("Song Command Error:", e);
     reply(`❌ Error: ${e.message}`);
   }
 });
+
+// Handle button responses
+    if (m.message?.buttonsResponseMessage) {
+      const buttonId = m.message.buttonsResponseMessage.selectedButtonId;
+
+      if (buttonId.startsWith("song_audio_")) {
+        const url = buttonId.replace("song_audio_", "");
+        await conn.sendMessage(from, {
+          audio: { url },
+          mimetype: "audio/mpeg",
+        }, { quoted: m });
+      }
+
+      if (buttonId.startsWith("song_doc_")) {
+        const url = buttonId.replace("song_doc_", "");
+        await conn.sendMessage(from, {
+          document: { url },
+          mimetype: "audio/mpeg",
+          fileName: "song.mp3",
+          caption: `${CREATER}`,
+        }, { quoted: m });
+      }
+    }
+  });
+
 //============ video download ================
 
 cmd({
