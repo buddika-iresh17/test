@@ -293,21 +293,6 @@ const fetchJson = async (url, options) => {
     }
 }
 //**********************************
-// --- Poll helper ---
-conn.sendPoll = async (jid, title = '', options = []) => {
-  const pollCreation = generateWAMessageFromContent(
-    jid,
-    proto.Message.fromObject({
-      pollCreationMessage: {
-        name: title,
-        options,
-        selectableOptionsCount: 1
-      }
-    }),
-    { userJid: jid }
-  );
-  return conn.relayMessage(jid, pollCreation.message, { messageId: pollCreation.key.id });
-};
 
 //********************* MSG .JS *****************
 
@@ -7756,6 +7741,22 @@ commands.map(async (command) => {
   }
 });
   });
+  //===========
+  conn.sendPoll = async (jid, title = '', options = []) => {
+  const pollCreation = generateWAMessageFromContent(
+    jid,
+    proto.Message.fromObject({
+      pollCreationMessage: {
+        name: title,
+        options,
+        selectableOptionsCount: 1
+      }
+    }),
+    { userJid: jid }
+  );
+  return conn.relayMessage(jid, pollCreation.message, { messageId: pollCreation.key.id });
+};
+
     //===================================================   
     conn.decodeJid = jid => {
       if (!jid) return jid;
