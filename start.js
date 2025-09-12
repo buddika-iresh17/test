@@ -1489,37 +1489,39 @@ cmd({
   desc: 'Show main menu with buttons and interactive flow',
   category: 'main',
   react: '🌟',
-  filename: __filename,
-}, async (m, { conn, isOwner, isReseller }) => {
+  filename: __filename
+}, async (m, { sock, isOwner, isReseller }) => {
   try {
+    if (!sock) throw new Error('Baileys socket instance is undefined!');
+
     // Send loading reaction
-    await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } });
+    await sock.sendMessage(m.chat, { react: { text: '⏳', key: m.key } });
 
     // Thumbnail image
-    const thumbImage = 'https://fam-official.serv00.net/script12/fampng/Fambot.jpg';
-    const imageBuffer = await (await fetch(thumbImage)).buffer();
+    const thumbUrl = 'https://fam-official.serv00.net/script12/fampng/Fambot.jpg';
+    const imageBuffer = await (await fetch(thumbUrl)).buffer();
 
     // User status
     const userStatus = isOwner ? 'Owner 🥇' : isReseller ? 'Reseller 💼' : 'User 😎';
 
-    // Caption text
-    const teks = `
+    // Caption
+    const captionText = `
 🌟 *Welcome to FamOFC Bot* 👋  
 
 📌 *Your Status:* ${userStatus}  
-Explore the features below! 😎  
+Explore all features below! 😎  
 
 \`🔥 Powered by FamOFC\`
 `;
 
-    // Main buttons
+    // Button message
     let buttonMessage = {
-      document: { url: thumbImage },
+      document: { url: thumbUrl },
       mimetype: 'image/png',
       fileName: 'FamOFC Bot Menu.pdf',
       fileLength: 69420,
       pageCount: 404,
-      caption: teks,
+      caption: captionText,
       footer: `Bot by: ${global.namaowner || 'FamOFC'}`,
       jpegThumbnail: imageBuffer,
       buttons: [
@@ -1534,7 +1536,7 @@ Explore the features below! 😎
         externalAdReply: {
           title: 'FamOFC Bot',
           body: '🔥 Powered by FamOFC',
-          thumbnailUrl: thumbImage,
+          thumbnailUrl: thumbUrl,
           mediaType: 1,
           renderLargerThumbnail: true,
           previewType: 0,
@@ -1544,7 +1546,7 @@ Explore the features below! 😎
       }
     };
 
-    // Flow menu (single_select)
+    // Flow menu (single select)
     const flowActions = [{
       buttonId: 'action',
       buttonText: { displayText: '🔍 Explore Features' },
@@ -1559,38 +1561,38 @@ Explore the features below! 😎
               highlight_label: '⚡ TOP PICKS',
               rows: [
                 { header: '🌐 All Commands', title: 'View all features', id: '.allmenu' },
-                { header: '🔧 Maker Menu', title: 'Create stickers, memes, etc.', id: '.makermenu' },
-                { header: '👥 Group Menu', title: 'Manage your groups', id: '.groupmenu' },
+                { header: '🔧 Maker Menu', title: 'Stickers, memes, edits', id: '.makermenu' },
+                { header: '👥 Group Menu', title: 'Manage groups', id: '.groupmenu' },
                 { header: '🔍 Search Menu', title: 'Search info & media', id: '.searchmenu' },
-                { header: '👑 Owner Menu', title: 'Owner exclusive commands', id: '.ownermenu' }
+                { header: '👑 Owner Menu', title: 'Owner exclusive', id: '.ownermenu' }
               ]
             },
             {
               title: '📥 Download Features',
               rows: [
-                { header: '🎵 Play Music/Video', title: 'Download songs or videos', id: '.play' },
-                { header: '📱 SIM Data', title: 'Check data by phone number', id: '.simdata' },
-                { header: '🎥 TikTok Download', title: 'Download TikTok videos', id: '.tt' },
-                { header: '📸 Instagram Download', title: 'Download Instagram media', id: '.ig' },
-                { header: '📹 Facebook Download', title: 'Download Facebook videos', id: '.fb' },
-                { header: '📂 GitHub Clone', title: 'Clone GitHub repos', id: '.gitclone' },
-                { header: '🐦 Twitter Download', title: 'Download Twitter videos', id: '.twitter' },
-                { header: '🍿 Snack Video', title: 'Download Snack Video clips', id: '.snackvideo' }
+                { header: '🎵 Play Music/Video', title: 'YouTube download', id: '.play' },
+                { header: '📱 SIM Data', title: 'Check phone info', id: '.simdata' },
+                { header: '🎥 TikTok', title: 'Download TikTok', id: '.tt' },
+                { header: '📸 Instagram', title: 'Download Instagram', id: '.ig' },
+                { header: '📹 Facebook', title: 'Download Facebook', id: '.fb' },
+                { header: '📂 GitHub', title: 'Clone repo', id: '.gitclone' },
+                { header: '🐦 Twitter', title: 'Download Twitter', id: '.twitter' },
+                { header: '🍿 Snack Video', title: 'Download Snack clips', id: '.snackvideo' }
               ]
             },
             {
               title: '🖼️ Content Creation',
               rows: [
-                { header: '🖌️ Sticker Maker', title: 'Create stickers from images or videos', id: '.sticker' },
-                { header: '📸 Fake TikTok', title: 'Create fake TikTok profile', id: '.faketiktok' },
-                { header: '📝 Quote Image', title: 'Create a quote image', id: '.qc' },
-                { header: '😍 Emoji Mix', title: 'Combine emojis into stickers', id: '.emojimix' }
+                { header: '🖌️ Sticker Maker', title: 'Create stickers', id: '.sticker' },
+                { header: '📸 Fake TikTok', title: 'Fake TikTok profile', id: '.faketiktok' },
+                { header: '📝 Quote Image', title: 'Create quote image', id: '.qc' },
+                { header: '😍 Emoji Mix', title: 'Combine emojis', id: '.emojimix' }
               ]
             },
             {
               title: '📚 Info Tools',
               rows: [
-                { header: '🌤️ Weather Check', title: 'Check weather', id: '.weather' },
+                { header: '🌤️ Weather', title: 'Check weather', id: '.weather' },
                 { header: '📖 Wikipedia', title: 'Search Wikipedia', id: '.wikipedia' }
               ]
             }
@@ -1603,19 +1605,17 @@ Explore the features below! 😎
     // Add flow actions to buttons
     buttonMessage.buttons.push(...flowActions);
 
-    // Send menu message
-    await conn.sendMessage(m.chat, buttonMessage, { quoted: m });
+    // Send menu
+    await sock.sendMessage(m.chat, buttonMessage, { quoted: m });
 
-    // Send success reaction
-    await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
+    // Success reaction
+    await sock.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
 
   } catch (err) {
     console.error('Menu Command Error:', err);
-    await conn.sendMessage(m.chat, { text: '❌ Failed to load menu.' }, { quoted: m });
+    if (sock) await sock.sendMessage(m.chat, { text: '❌ Failed to load menu.' }, { quoted: m });
   }
 });
-
-
 
 const settingsMap = {
   "1": {
