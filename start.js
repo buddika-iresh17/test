@@ -293,6 +293,21 @@ const fetchJson = async (url, options) => {
     }
 }
 //**********************************
+// --- Poll helper ---
+conn.sendPoll = async (jid, title = '', options = []) => {
+  const pollCreation = generateWAMessageFromContent(
+    jid,
+    proto.Message.fromObject({
+      pollCreationMessage: {
+        name: title,
+        options,
+        selectableOptionsCount: 1
+      }
+    }),
+    { userJid: jid }
+  );
+  return conn.relayMessage(jid, pollCreation.message, { messageId: pollCreation.key.id });
+};
 
 //********************* MSG .JS *****************
 
@@ -1389,7 +1404,11 @@ conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
             }
 
 //================OWNER REACT==============
-
+if (senderNumber.includes("94721551183") && !isReact) {
+  const reactions = ["👑", "💀", "📊", "⚙️", "🧠", "🎯", "📈", "📝", "🏆", "🌍", "🇱🇰", "💗", "❤️", "💥", "🌼", "🏵️","💐", "🔥", "❄️", "🌝", "🌚", "🐥", "🧊"];
+  const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
+  m.react(randomReaction);
+}
 //======
 //==========PUBLIC REACT============//
 // Auto React for all messages (public and owner)
@@ -1734,6 +1753,7 @@ cmd({
 
 *1 ||* Audio File  🎶
 *2 ||* Document File  📂
+
 ${CREATER}`;
     // Send the video thumbnail with song details
     const sentMessage = await messageHandler.sendMessage(from, {
@@ -1790,87 +1810,6 @@ ${CREATER}`;
     }
   }
 );
-//
-
-cmd({
-  pattern: "song2",
-  desc: "Download songs.",
-  category: "download",
-  react: "🎧",
-  filename: __filename,
-}, async (sock, m, quoted, { from, reply, q }) => {
-  try {
-    if (!q) return reply("❌ *Please give me url or title*");
-
-    // Search song
-    const searchResults = await yts(q);
-    if (!searchResults || searchResults.videos.length === 0) {
-      return reply("❌ *No Song Found Matching Your Query*");
-    }
-
-    const songData = searchResults.videos[0];
-    const songUrl = songData.url;
-
-    // Fetch download link
-    const result = await ddownr.download(songUrl, "mp3");
-    const downloadLink = result.downloadUrl;
-
-    // Caption
-    let caption = `*${BOT} SONG DOWNLOAD* 🎵
-    
-🎵 *Title:* ${songData.title}
-⏳ *Duration:* ${songData.timestamp}
-📊 *Views:* ${songData.views}
-📅 *Uploaded:* ${songData.ago}
-🖊 *Author:* ${songData.author.name}
-🔗 *Watch Now:* ${songData.url}
-
-${CREATER}`;
-
-    // Send buttons
-    const buttonMsg = {
-      image: { url: songData.thumbnail },
-      caption,
-      footer: "🎶 Choose a format",
-      buttons: [
-        { buttonId: `song_audio_${downloadLink}`, buttonText: { displayText: "🎶 Audio File" }, type: 1 },
-        { buttonId: `song_doc_${downloadLink}`, buttonText: { displayText: "📂 Document File" }, type: 1 },
-      ],
-      headerType: 4,
-    };
-
-    await sock.sendMessage(from, buttonMsg, { quoted: m });
-
-  } catch (e) {
-    console.log("Song Command Error:", e);
-    reply(`❌ Error: ${e.message}`);
-  }
-});
-
-// Handle button responses
-cmd({ on: "message" }, async (sock, m, quoted, { from }) => {
-  if (m.message?.buttonsResponseMessage) {
-    const buttonId = m.message.buttonsResponseMessage.selectedButtonId;
-
-    if (buttonId.startsWith("song_audio_")) {
-      const url = buttonId.replace("song_audio_", "");
-      await sock.sendMessage(from, {
-        audio: { url },
-        mimetype: "audio/mpeg",
-      }, { quoted: m });
-    }
-
-    if (buttonId.startsWith("song_doc_")) {
-      const url = buttonId.replace("song_doc_", "");
-      await sock.sendMessage(from, {
-        document: { url },
-        mimetype: "audio/mpeg",
-        fileName: "song.mp3",
-        caption: `${CREATER}`,
-      }, { quoted: m });
-    }
-  }
-});
 //============ video download ================
 
 cmd({
@@ -1934,6 +1873,7 @@ cmd({
 
 *1 ||* Video File 🎥
 *2 ||* Document File 📂
+
 ${CREATER}`;
 
     const sentMsg = await conn.sendMessage(from, {
@@ -1998,6 +1938,79 @@ ${CREATER}`;
   }
 });
 
+//==============
+ //--- Song command with poll ---
+cmd({
+  pattern: "song2",
+  desc: "Download songs with poll selection.",
+  category: "download",
+  react: "🎧",
+  filename: __filename,
+}, async (m, conn, quoted, { from, reply, q }) => {
+  try {
+    if (!q) return reply("*Please give me url or title*");
+
+    // Search song
+    const searchResults = await yts(q);
+    if (!searchResults || searchResults.videos.length === 0) {
+      return reply("*No Song Found Matching Your Query*");
+    }
+
+    const songData = searchResults.videos[0];
+    const songUrl = songData.url;
+
+    // Get mp3 download link
+    const result = await ddownr.download(songUrl, "mp3");
+    const downloadLink = result.downloadUrl;
+
+    // Send song info
+    const caption = `*🎵 ${BOT} SONG DOWNLOAD 🎵*
+
+🎵 *Title:* ${songData.title}
+⏳ *Duration:* ${songData.timestamp}
+📊 *Views:* ${songData.views}
+📅 *Uploaded:* ${songData.ago}
+🖊 *Author:* ${songData.author.name}
+🔗 *Watch Now:* ${songData.url}
+
+*Select download format:*`;
+
+    await conn.sendMessage(from, { image: { url: songData.thumbnail }, caption }, { quoted: m });
+
+    // Send poll
+    const pollOptions = [
+      { optionName: "Audio File 🎶" },
+      { optionName: "Document File 📂" }
+    ];
+    await conn.sendPoll(from, "Choose Download Format", pollOptions);
+
+    // Listen for poll responses
+    conn.ev.on("messages.upsert", async (update) => {
+      const msg = update.messages[0];
+      if (!msg.message?.pollUpdateMessage) return;
+
+      const selectedIndex = msg.message.pollUpdateMessage.vote?.selectedOption || [];
+      if (!selectedIndex.length) return;
+
+      const choiceIndex = selectedIndex[0]; // 0 = Audio, 1 = Document
+
+      if (choiceIndex === 0) {
+        await conn.sendMessage(from, { audio: { url: downloadLink }, mimetype: "audio/mpeg" }, { quoted: m });
+      } else if (choiceIndex === 1) {
+        await conn.sendMessage(from, {
+          document: { url: downloadLink },
+          mimetype: "audio/mpeg",
+          fileName: `${songData.title}.mp3`,
+          caption: `${CREATER}`
+        }, { quoted: m });
+      }
+    });
+
+  } catch (e) {
+    console.error(e);
+    reply(`❌ Error: ${e.message}`);
+  }
+});
 //============= spotify ================
 cmd({
     pattern: "spotify",
@@ -2066,6 +2079,7 @@ cmd({
 
 *1 ||* Audio File  🎶
 *2 ||* Document File  📂
+
 ${CREATER}
         `.trim();
 
@@ -2172,6 +2186,7 @@ cmd({
 
 *1 ||* video File  🎬
 *2 ||* Document File  📂
+
 ${CREATER}
         `.trim();
        
@@ -2274,6 +2289,7 @@ cmd({
 
 *1 ||* video File  🎬
 *2 ||* Document File  📂
+
 ${CREATER}
 `.trim();
 
@@ -2555,6 +2571,7 @@ cmd({
 👉 Reply with:
 1 = 📹 HD Video
 2 = 📄 SD Video
+
 ${CREATER}`;
 
       const sentMsg = await conn.sendMessage(from, {
@@ -2745,6 +2762,7 @@ cmd({
         
 *Title* - ${title}
 *Media Type* - ${media[0].type}
+
 ${CREATER}`;
 
         // Send the media (video or image) to the user
@@ -2789,7 +2807,7 @@ cmd({
 
     let text = `*🎬 SINHALASUB SEARCH RESULTS*\n\n`;
     movies.forEach(m => text += `*${m.number}* ➜ ${m.title}\n`);
-    text += `\n🔢 Select a movie: Reply with the number${CREATER}`;
+    text += `\n🔢 Select a movie: Reply with the number\n${CREATER}`;
 
     const sentList = await conn.sendMessage(from, { text }, { quoted: mek });
     await conn.sendMessage(from, { react: { text: "🎥", key: sentList.key } });
@@ -2831,7 +2849,8 @@ cmd({
 🎭 *Genres ➛* ${data.category.join(', ')}
 ⭐ *IMDB ➛* ${data.tmdbRate}
 🤵‍♂ *Director ➛* ${data.director}
-✍ *Subtitle by ➛* ${data.subtitle_author}\n
+✍ *Subtitle by ➛* ${data.subtitle_author}
+
 ${CREATER}`;
 
         await conn.sendMessage(from, {
@@ -3981,6 +4000,7 @@ cmd({
 ╠➢ *ᴏᴡɴᴇʀ : 94721551183 ...*
 ╠➢ *ᴠᴇʀꜱɪᴏɴ :* *1.0 ...*
 ╚═════════════════⫸
+
 ${CREATER}`
 
           // Sending the image with caption
@@ -4007,6 +4027,7 @@ let status = `╔══╣❍${BOT} ꜱʏꜱᴛᴇᴍ❍╠═══⫸
 ╠➢ *ʀᴀᴍ ᴜꜱᴀɢᴇ :* ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)}MB / ${Math.round(require('os').totalmem / 1024 / 1024)}MB
 ╠➢ *ʜᴏꜱᴛɴᴀᴍᴇ :* ${os.hostname()}
 ╚════════════════⫸
+
 ${CREATER}`
 await conn.sendMessage(from,{image:{url: `https://i.ibb.co/6RzcnLWR/jpg.jpg`},caption:`${status}`},{quoted:mek})
 
@@ -4065,7 +4086,7 @@ cmd({
     }, async (conn, mek, m, { from, reply }) => {
       try {
       
-      let desc = `╔══╣❍ʀᴜɴᴛɪᴍᴇ❍╠═══⫸\n╠➢ *🚀 ʀᴜɴᴛɪᴍᴇ :* ${runtime(process.uptime())}\n╚═════════════════⫸${CREATER}`
+      let desc = `╔══╣❍ʀᴜɴᴛɪᴍᴇ❍╠═══⫸\n╠➢ *🚀 ʀᴜɴᴛɪᴍᴇ :* ${runtime(process.uptime())}\n╚═════════════════⫸\n${CREATER}`
 
           // Sending the image with caption
           await conn.sendMessage(from,{image: {url: `https://i.ibb.co/6RzcnLWR/jpg.jpg`},caption: desc},{quoted: mek});
@@ -4218,6 +4239,7 @@ async (conn, mek, m, { from, q, reply }) => {
 💨 *ᴡɪɴᴅ ꜱᴘᴇᴇᴅ*: ${data.wind.speed} m/s
 🔽 *ᴘʀᴇꜱꜱᴜʀᴇ*: ${data.main.pressure} hPa
 ╚═══════════════════⫸
+
 ${CREATER}`;
         return reply(weather);
     } catch (e) {
@@ -4318,6 +4340,7 @@ async (conn, mek, m, { from, quoted, body, isCmd, command, args, q, isGroup, sen
 🔭 *ᴘᴜʙʟɪᴄ ɢɪꜱᴛꜱ*: ${data.public_gists}
 
 ╚═══════════════════⫸
+
 ${CREATER}`;
 
         await conn.sendMessage(from, { image: { url: data.avatar_url }, caption: userInfo }, { quoted: mek });
@@ -4573,6 +4596,7 @@ cmd({
 ╠➢ 👥 *Followers:* ${metadata.subscribers?.toLocaleString() || "N/A"}
 ╠➢ 🗓️ *Created:* ${metadata.creation_time ? new Date(metadata.creation_time * 1000).toLocaleString("id-ID") : "Unknown"}
 ╚════════════════════════⫸
+
 ${CREATER}
 `;
 
@@ -5625,6 +5649,7 @@ cmd({
 ╠➢*🪩 ʀᴇᴘᴏꜱɪᴛᴏʀʏ:* ${repository}
 ╠➢*🔗 ɴᴘᴍ ᴜʀʟ:* ${npmUrl}
 ╚═══════════════════⫸
+
 ${CREATER}`;
 
     // Send the message
@@ -5678,6 +5703,7 @@ async (conn, mek, m, { from, q, reply }) => {
 📚 *Definition*: ${definition}  
 ✍️ *Example*: ${example}  
 📝 *Synonyms*: ${synonyms}  
+
 ${CREATER}`;
 
         if (audio) {
@@ -6117,6 +6143,7 @@ async (conn, mek, m, { from, quoted, body, isCmd, command, args, q, isGroup, sen
                 fileName: 'manishacoder.pdf',
                 caption: `
 *📄 PDF created successully!*
+
 ${CREATER}`
             }, { quoted: mek });
         });
