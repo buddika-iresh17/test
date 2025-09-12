@@ -1923,46 +1923,80 @@ ${CREATER}`;
   }
 });
 
-//==============
- //--- Song command with poll ---
+//=============
+
 cmd({
-  pattern: "song2",
-  desc: "Download songs with poll selection.",
+  pattern: "spotify2",
+  alias: ["sp2", "spotifydl2"],
+  react: "🎵",
+  desc: "Download Spotify music by search",
   category: "download",
-  react: "🎧",
-  filename: __filename,
+  use: '.spotify <search term>',
+  filename: __filename
 }, async (m, conn, quoted, { from, reply, q }) => {
   try {
-    if (!q) return reply("*Please give me url or title*");
+    if (!q) return reply("❗ Please provide a search term!");
 
-    // Search song
-    const searchResults = await yts(q);
-    if (!searchResults || searchResults.videos.length === 0) {
-      return reply("*No Song Found Matching Your Query*");
+    const delay = ms => new Promise(res => setTimeout(res, ms));
+    const maxRetries = 3;
+    let searchData, downloadData;
+
+    // 🔍 Retry Spotify Search
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const searchUrl = `https://api.giftedtech.web.id/api/search/spotifysearch?apikey=gifted&query=${encodeURIComponent(q)}`;
+        const { data } = await axios.get(searchUrl, { timeout: 10000 });
+        searchData = data;
+        break;
+      } catch (err) {
+        if (attempt === maxRetries) throw new Error("Spotify search failed. Server timeout or unavailable.");
+        await delay(2000);
+      }
     }
 
-    const songData = searchResults.videos[0];
-    const songUrl = songData.url;
+    if (!searchData?.results || searchData.results.length === 0) {
+      return reply("❌ No results found for your search.");
+    }
 
-    // Get mp3 download link
-    const result = await ddownr.download(songUrl, "mp3");
-    const downloadLink = result.downloadUrl;
+    const track = searchData.results[0];
+    const songUrl = track.url;
 
-    // Send song info
-    const caption = `*🎵 ${BOT} SONG DOWNLOAD 🎵*
+    // ⬇️ Retry Spotify Download
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const downloadUrl = `https://api.giftedtech.web.id/api/download/spotifydl?apikey=gifted&url=${encodeURIComponent(songUrl)}`;
+        const { data } = await axios.get(downloadUrl, { timeout: 10000 });
+        downloadData = data;
+        break;
+      } catch (err) {
+        if (attempt === maxRetries) throw new Error("Spotify download failed. Server timeout or unavailable.");
+        await delay(2000);
+      }
+    }
 
-🎵 *Title:* ${songData.title}
-⏳ *Duration:* ${songData.timestamp}
-📊 *Views:* ${songData.views}
-📅 *Uploaded:* ${songData.ago}
-🖊 *Author:* ${songData.author.name}
-🔗 *Watch Now:* ${songData.url}
+    if (!downloadData?.result?.download_url) {
+      return reply("❌ Failed to get download link.");
+    }
 
-*Select download format:*`;
+    const result = downloadData.result;
 
-    await conn.sendMessage(from, { image: { url: songData.thumbnail }, caption }, { quoted: m });
+    // Send track info
+    const caption = `
+*${BOT} SPOTIFY DOWNLOADER* 🎧
 
-    // Send poll
+🎵 *Title:* ${track.title}
+🧑 *Artist:* ${track.artist}
+🕒 *Duration:* ${track.duration}
+🔗 *Link:* ${songUrl}
+
+*Select Download Format:*`;
+
+    await conn.sendMessage(from, {
+      image: { url: result.thumbnail },
+      caption
+    }, { quoted: m });
+
+    // Send poll for download format
     const pollOptions = [
       { optionName: "Audio File 🎶" },
       { optionName: "Document File 📂" }
@@ -1980,19 +2014,23 @@ cmd({
       const choiceIndex = selectedIndex[0]; // 0 = Audio, 1 = Document
 
       if (choiceIndex === 0) {
-        await conn.sendMessage(from, { audio: { url: downloadLink }, mimetype: "audio/mpeg" }, { quoted: m });
+        await conn.sendMessage(from, {
+          audio: { url: result.download_url },
+          mimetype: "audio/mpeg",
+          caption: `${CREATER}`
+        }, { quoted: m });
       } else if (choiceIndex === 1) {
         await conn.sendMessage(from, {
-          document: { url: downloadLink },
+          document: { url: result.download_url },
           mimetype: "audio/mpeg",
-          fileName: `${songData.title}.mp3`,
+          fileName: `${track.title}.mp3`,
           caption: `${CREATER}`
         }, { quoted: m });
       }
     });
 
   } catch (e) {
-    console.error(e);
+    console.log(e);
     reply(`❌ Error: ${e.message}`);
   }
 });
