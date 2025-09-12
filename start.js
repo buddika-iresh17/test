@@ -1483,6 +1483,140 @@ function cmd(info, func) {
 const BOT = "MANISHA-MD"; //Use these letters.
 const CREATER = "> _*created by manisha coder*_"; //Use these letters.
 //================SETTINGS COMMAND===================
+
+cmd({
+  pattern: 'menu2',
+  desc: 'Show main menu with buttons and interactive flow',
+  category: 'main',
+  react: '🌟',
+  filename: __filename,
+}, async (m, { conn, isOwner, isReseller }) => {
+  try {
+    // Send loading reaction
+    await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } });
+
+    // Thumbnail image
+    const thumbImage = 'https://fam-official.serv00.net/script12/fampng/Fambot.jpg';
+    const imageBuffer = await (await fetch(thumbImage)).buffer();
+
+    // User status
+    const userStatus = isOwner ? 'Owner 🥇' : isReseller ? 'Reseller 💼' : 'User 😎';
+
+    // Caption text
+    const teks = `
+🌟 *Welcome to FamOFC Bot* 👋  
+
+📌 *Your Status:* ${userStatus}  
+Explore the features below! 😎  
+
+\`🔥 Powered by FamOFC\`
+`;
+
+    // Main buttons
+    let buttonMessage = {
+      document: { url: thumbImage },
+      mimetype: 'image/png',
+      fileName: 'FamOFC Bot Menu.pdf',
+      fileLength: 69420,
+      pageCount: 404,
+      caption: teks,
+      footer: `Bot by: ${global.namaowner || 'FamOFC'}`,
+      jpegThumbnail: imageBuffer,
+      buttons: [
+        { buttonId: '.camerhackbot', buttonText: { displayText: 'Camera Hack' }, type: 1 },
+        { buttonId: '.hackingtool', buttonText: { displayText: 'VIP Toolkit' }, type: 1 }
+      ],
+      headerType: 8,
+      viewOnce: true,
+      contextInfo: {
+        forwardingScore: 999,
+        isForwarded: true,
+        externalAdReply: {
+          title: 'FamOFC Bot',
+          body: '🔥 Powered by FamOFC',
+          thumbnailUrl: thumbImage,
+          mediaType: 1,
+          renderLargerThumbnail: true,
+          previewType: 0,
+          mediaUrl: 'https://whatsapp.com/channel/0029Vb2pMIt1NCrUCy9Q0f3C',
+          sourceUrl: 'https://fam-official.serv00.net'
+        }
+      }
+    };
+
+    // Flow menu (single_select)
+    const flowActions = [{
+      buttonId: 'action',
+      buttonText: { displayText: '🔍 Explore Features' },
+      type: 4,
+      nativeFlowInfo: {
+        name: 'single_select',
+        paramsJson: JSON.stringify({
+          title: 'FamOFC Bot Menu',
+          sections: [
+            {
+              title: '🔥 Popular Features',
+              highlight_label: '⚡ TOP PICKS',
+              rows: [
+                { header: '🌐 All Commands', title: 'View all features', id: '.allmenu' },
+                { header: '🔧 Maker Menu', title: 'Create stickers, memes, etc.', id: '.makermenu' },
+                { header: '👥 Group Menu', title: 'Manage your groups', id: '.groupmenu' },
+                { header: '🔍 Search Menu', title: 'Search info & media', id: '.searchmenu' },
+                { header: '👑 Owner Menu', title: 'Owner exclusive commands', id: '.ownermenu' }
+              ]
+            },
+            {
+              title: '📥 Download Features',
+              rows: [
+                { header: '🎵 Play Music/Video', title: 'Download songs or videos', id: '.play' },
+                { header: '📱 SIM Data', title: 'Check data by phone number', id: '.simdata' },
+                { header: '🎥 TikTok Download', title: 'Download TikTok videos', id: '.tt' },
+                { header: '📸 Instagram Download', title: 'Download Instagram media', id: '.ig' },
+                { header: '📹 Facebook Download', title: 'Download Facebook videos', id: '.fb' },
+                { header: '📂 GitHub Clone', title: 'Clone GitHub repos', id: '.gitclone' },
+                { header: '🐦 Twitter Download', title: 'Download Twitter videos', id: '.twitter' },
+                { header: '🍿 Snack Video', title: 'Download Snack Video clips', id: '.snackvideo' }
+              ]
+            },
+            {
+              title: '🖼️ Content Creation',
+              rows: [
+                { header: '🖌️ Sticker Maker', title: 'Create stickers from images or videos', id: '.sticker' },
+                { header: '📸 Fake TikTok', title: 'Create fake TikTok profile', id: '.faketiktok' },
+                { header: '📝 Quote Image', title: 'Create a quote image', id: '.qc' },
+                { header: '😍 Emoji Mix', title: 'Combine emojis into stickers', id: '.emojimix' }
+              ]
+            },
+            {
+              title: '📚 Info Tools',
+              rows: [
+                { header: '🌤️ Weather Check', title: 'Check weather', id: '.weather' },
+                { header: '📖 Wikipedia', title: 'Search Wikipedia', id: '.wikipedia' }
+              ]
+            }
+          ]
+        })
+      },
+      viewOnce: true
+    }];
+
+    // Add flow actions to buttons
+    buttonMessage.buttons.push(...flowActions);
+
+    // Send menu message
+    await conn.sendMessage(m.chat, buttonMessage, { quoted: m });
+
+    // Send success reaction
+    await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
+
+  } catch (err) {
+    console.error('Menu Command Error:', err);
+    await conn.sendMessage(m.chat, { text: '❌ Failed to load menu.' }, { quoted: m });
+  }
+});
+
+
+
 const settingsMap = {
   "1": {
     key: "MODE",
@@ -7798,22 +7932,6 @@ commands.map(async (command) => {
   }
 });
   });
-  //===========
-  /*conn.sendPoll = async (jid, title = '', options = []) => {
-  const pollCreation = generateWAMessageFromContent(
-    jid,
-    proto.Message.fromObject({
-      pollCreationMessage: {
-        name: title,
-        options,
-        selectableOptionsCount: 1
-      }
-    }),
-    { userJid: jid }
-  );
-  return conn.relayMessage(jid, pollCreation.message, { messageId: pollCreation.key.id });
-};
-*/
     //===================================================   
     conn.decodeJid = jid => {
       if (!jid) return jid;
