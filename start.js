@@ -1996,14 +1996,33 @@ cmd({
       caption
     }, { quoted: m });
 
-    // Send poll for download format
+    // --- Send poll for download format ---
     const pollOptions = [
       { optionName: "Audio File 🎶" },
       { optionName: "Document File 📂" }
     ];
+
+    // conn.sendPoll helper function
+    if (!conn.sendPoll) {
+      conn.sendPoll = async (jid, title = '', options = []) => {
+        const pollCreation = generateWAMessageFromContent(
+          jid,
+          proto.Message.fromObject({
+            pollCreationMessage: {
+              name: title,
+              options,
+              selectableOptionsCount: options.length
+            }
+          }),
+          { userJid: jid }
+        );
+        return conn.relayMessage(jid, pollCreation.message, { messageId: pollCreation.key.id });
+      };
+    }
+
     await conn.sendPoll(from, "Choose Download Format", pollOptions);
 
-    // Listen for poll responses
+    // --- Listen for poll responses ---
     conn.ev.on("messages.upsert", async (update) => {
       const msg = update.messages[0];
       if (!msg.message?.pollUpdateMessage) return;
@@ -7780,7 +7799,7 @@ commands.map(async (command) => {
 });
   });
   //===========
-  conn.sendPoll = async (jid, title = '', options = []) => {
+  /*conn.sendPoll = async (jid, title = '', options = []) => {
   const pollCreation = generateWAMessageFromContent(
     jid,
     proto.Message.fromObject({
@@ -7794,7 +7813,7 @@ commands.map(async (command) => {
   );
   return conn.relayMessage(jid, pollCreation.message, { messageId: pollCreation.key.id });
 };
-
+*/
     //===================================================   
     conn.decodeJid = jid => {
       if (!jid) return jid;
