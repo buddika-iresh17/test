@@ -91,7 +91,7 @@ var videotime = 60000; // 1000 min
 // 📁 Directories
 const storeDir = path.join(process.cwd(), 'start');
   //======================
-  const prefix = /^[°zZ#$@+,.?=''():√%!¢£¥€π¤ΠΦ&><™©®Δ^βα¦|/\\©^]/.test(body) ? body.match(/^[°zZ#$@+,.?=''():√%¢£¥€π¤ΠΦ&><!™©®Δ^βα¦|/\\©^]/gi) : ''
+  const prefix = config.PREFIX
   //===================
   const ownerNumber = config.OWNER_NUMBER
 //======================================
@@ -1343,8 +1343,7 @@ async function connectToWA() {
   const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : ''
   const isCmd = body.startsWith(prefix)
   var budy = typeof mek.text == 'string' ? mek.text : false;
-  const cmdName =  isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : ''
-  //const cmdName = isCmd ? body.slice(prefix.length).trim().split(' ')[0].toLowerCase() : '';
+  const cmdName = isCmd ? body.slice(prefix.length).trim().split(' ')[0].toLowerCase() : '';
  const args = isCmd ? body.slice(prefix.length).trim().split(' ').slice(1) : [];
   const q = args.join(' ')
   const text = args.join(' ')
