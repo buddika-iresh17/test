@@ -91,7 +91,7 @@ var videotime = 60000; // 1000 min
 // 📁 Directories
 const storeDir = path.join(process.cwd(), 'start');
   //======================
-  const prefix = config.PREFIX
+  const prefix = /^[°zZ#$@+,.?=''():√%!¢£¥€π¤ΠΦ&><™©®Δ^βα¦|/\\©^]/.test(body) ? body.match(/^[°zZ#$@+,.?=''():√%¢£¥€π¤ΠΦ&><!™©®Δ^βα¦|/\\©^]/gi) : ''
   //===================
   const ownerNumber = config.OWNER_NUMBER
 //======================================
@@ -351,267 +351,204 @@ const downloadMediaMessage = async(m, filename) => {
 }
 
 const sms = (conn, m, store) => {
-  if (!m) return m;
-  let M = proto.WebMessageInfo;
-
-  // basic key-derived fields
-  if (m.key) {
-    m.id = m.key.id;
-    m.isBot = typeof m.id === 'string' && m.id.startsWith('BAES') && m.id.length === 16;
-    m.isBaileys = typeof m.id === 'string' && m.id.startsWith('BAE5') && m.id.length === 16;
-    m.chat = m.key.remoteJid;
-    m.fromMe = !!m.key.fromMe;
-    m.isGroup = !!m.chat && m.chat.endsWith('@g.us');
-    m.sender = m.fromMe
-      ? (conn.user && conn.user.id ? conn.user.id.split(':')[0] + '@s.whatsapp.net' : '')
-      : (m.isGroup ? m.key.participant : m.key.remoteJid);
-  }
-
-  // message wrappers
-  if (m.message) {
-    m.mtype = getContentType(m.message);
-    // normalize viewOnce message structure
-    if (m.mtype === 'viewOnceMessage') {
-      const inner = m.message.viewOnceMessage?.message;
-      if (inner) {
-        const innerType = getContentType(inner);
-        m.msg = inner[innerType];
-      } else {
-        m.msg = m.message[m.mtype];
-      }
-    } else {
-      m.msg = m.message[m.mtype];
+    if (!m) return m
+    let M = proto.WebMessageInfo
+    if (m.key) {
+        m.id = m.key.id
+        m.isBot = m.id.startsWith('BAES') && m.id.length === 16
+	m.isBaileys = m.id.startsWith('BAE5') && m.id.length === 16
+        m.chat = m.key.remoteJid
+        m.fromMe = m.key.fromMe
+        m.isGroup = m.chat.endsWith('@g.us')
+        m.sender = m.fromMe ? conn.user.id.split(':')[0]+'@s.whatsapp.net' : m.isGroup ? m.key.participant : m.key.remoteJid
+        //m.sender = conn.decodeJid(m.fromMe && conn.user.id || m.participant || m.key.participant || m.chat || '')
+        //if (m.isGroup) m.participant = conn.decodeJid(m.key.participant) || ''
     }
-
-    // safe body extraction
-    try {
-      m.body = (m.mtype === 'conversation')
-        ? (m.message.conversation || '')
-        : (m.mtype === 'imageMessage')
-          ? (m.message.imageMessage?.caption || '')
-          : (m.mtype === 'videoMessage')
-            ? (m.message.videoMessage?.caption || '')
-            : (m.mtype === 'documentMessage')
-              ? (m.message.documentMessage?.caption || '')
-              : (m.mtype === 'extendedTextMessage')
-                ? (m.message.extendedTextMessage?.text || '')
-                : (m.mtype === 'buttonsResponseMessage')
-                  ? (m.message.buttonsResponseMessage?.selectedButtonId || '')
-                  : (m.mtype === 'listResponseMessage')
-                    ? (m.message.listResponseMessage?.singleSelectReply?.selectedRowId || '')
-                    : (m.mtype === 'templateButtonReplyMessage')
-                      ? (m.message.templateButtonReplyMessage?.selectedId || '')
-                      : (m.mtype === 'interactiveResponseMessage')
-                        ? (m.message.interactiveResponseMessage?.selectedId || '')
-                        : '';
-    } catch (e) {
-      m.body = '';
-    }
-
-    // fallback: unify text-like field
-    m.text = m.msg?.text || m.msg?.caption || m.message.conversation || m.msg?.contentText || m.msg?.selectedDisplayText || m.msg?.title || '';
-
-    // quoted message handling
-    let quoted = (m.quoted = m.msg?.contextInfo ? m.msg.contextInfo.quotedMessage : null);
-    m.mentionedJid = m.msg?.contextInfo?.mentionedJid || [];
-
-    if (m.quoted) {
-      let type = getContentType(quoted);
-
-      // If productMessage wrapper, unwrap
-      if (type === 'productMessage') {
-        type = getContentType(m.quoted);
-      }
-
-      m.quoted = m.quoted[type] || m.quoted;
-
-      // If quoted is primitive string, wrap it
-      if (typeof m.quoted === 'string') m.quoted = { text: m.quoted };
-
-      // detect view once (various shapes)
-      const isViewOnce = !!(quoted.viewOnceMessage || quoted.viewOnceMessageV2);
-
-      if (isViewOnce) {
-        // keep a record and raw quoted object for view-once handling
-        m.quoted.isViewOnce = true;
-        m.quoted.raw = quoted;
-      } else {
-        // normal quoted message metadata
-        m.quoted.mtype = type;
-        m.quoted.id = m.msg?.contextInfo?.stanzaId || m.quoted.id || '';
-        m.quoted.chat = m.msg?.contextInfo?.remoteJid || m.chat;
-        m.quoted.isBot = m.quoted.id ? (m.quoted.id.startsWith('BAES') && m.quoted.id.length === 16) : false;
-        m.quoted.isBaileys = m.quoted.id ? (m.quoted.id.startsWith('BAE5') && m.quoted.id.length === 16) : false;
-        m.quoted.sender = conn.decodeJid?.(m.msg.contextInfo?.participant) || m.quoted.sender;
-        m.quoted.fromMe = m.quoted.sender === (conn.user && conn.user.id);
-        m.quoted.text = m.quoted.text || m.quoted.caption || m.quoted.conversation || m.quoted.contentText || m.quoted.selectedDisplayText || m.quoted.title || '';
-        m.quoted.mentionedJid = m.msg.contextInfo?.mentionedJid || [];
-
-        // quoted message helpers
-        m.getQuotedObj = m.getQuotedMessage = async () => {
-          if (!m.quoted.id) return false;
-          try {
-            const q = await store.loadMessage(m.chat, m.quoted.id, conn);
-            if (!q) return false;
-            return sms(conn, q, store); // call this function recursively
-          } catch (e) {
-            return false;
-          }
-        };
-
-        // prepare fake message object for forwarding/copying
-        const vM = m.quoted.fakeObj = M.fromObject({
-          key: {
-            remoteJid: m.quoted.chat,
-            fromMe: m.quoted.fromMe,
-            id: m.quoted.id
-          },
-          message: quoted,
-          ...(m.isGroup ? { participant: m.quoted.sender } : {})
-        });
-
-        const key = {
-          remoteJid: m.chat,
-          fromMe: false,
-          id: m.quoted.id,
-          participant: m.quoted.sender
-        };
-
-        // quoted helpers
-        m.quoted.delete = async () => {
-          try {
-            await conn.sendMessage(m.chat, { delete: key });
-            return true;
-          } catch (e) {
-            return false;
-          }
-        };
-
-        m.forwardMessage = (jid, forceForward = true, options = {}) =>
-          conn.copyNForward(jid, vM, forceForward, { contextInfo: { isForwarded: false } }, options);
-
-        m.quoted.download = () => conn.downloadMediaMessage(m.quoted);
-      }
-    }
-  }
-
-  // message download helper (for direct message object with url)
-  if (m.msg && m.msg.url) m.download = () => conn.downloadMediaMessage(m.msg);
-
-  // convenience copies / forwarding / sending helpers
-  m.copy = () => sms(conn, M.fromObject(M.toObject(m)), store);
-  m.copyNForward = (jid = m.chat, forceForward = false, options = {}) => conn.copyNForward(jid, m, forceForward, options);
-
-  m.sticker = (stik, id = m.chat, option = { mentions: [m.sender] }) =>
-    conn.sendMessage(id, { sticker: stik, contextInfo: { mentionedJid: option.mentions } }, { quoted: m });
-
-  m.replyimg = (img, teks, id = m.chat, option = { mentions: [m.sender] }) =>
-    conn.sendMessage(id, { image: img, caption: teks, contextInfo: { mentionedJid: option.mentions } }, { quoted: m });
-
-  m.imgurl = (img, teks, id = m.chat, option = { mentions: [m.sender] }) =>
-    conn.sendMessage(id, { image: { url: img }, caption: teks, contextInfo: { mentionedJid: option.mentions } }, { quoted: m });
-
-  // flexible reply helper
-  m.reply = async (content, opt = { packname: "Secktor", author: "SamPandey001" }, type = "text") => {
-    type = (type || 'text').toLowerCase();
-    switch (type) {
-      case "text":
-        return await conn.sendMessage(m.chat, { text: content }, { quoted: m });
-
-      case "image":
-        if (Buffer.isBuffer(content)) {
-          return await conn.sendMessage(m.chat, { image: content, ...opt }, { quoted: m });
-        } else if (isUrl(content)) {
-          return conn.sendMessage(m.chat, { image: { url: content }, ...opt }, { quoted: m });
-        }
-        break;
-
-      case "video":
-        if (Buffer.isBuffer(content)) {
-          return await conn.sendMessage(m.chat, { video: content, ...opt }, { quoted: m });
-        } else if (isUrl(content)) {
-          return await conn.sendMessage(m.chat, { video: { url: content }, ...opt }, { quoted: m });
-        }
-        break;
-
-      case "audio":
-        if (Buffer.isBuffer(content)) {
-          return await conn.sendMessage(m.chat, { audio: content, ...opt }, { quoted: m });
-        } else if (isUrl(content)) {
-          return await conn.sendMessage(m.chat, { audio: { url: content }, ...opt }, { quoted: m });
-        }
-        break;
-
-      case "template": {
-        const optional = await generateWAMessage(m.chat, content, opt);
-        const message = { viewOnceMessage: { message: { ...optional.message } } };
-        await conn.relayMessage(m.chat, message, { messageId: optional.key.id });
-        break;
-      }
-
-      case "sticker": {
-        let file = content;
+    if (m.message) {
+        m.mtype = getContentType(m.message)
+        m.msg = (m.mtype == 'viewOnceMessage' ? m.message[m.mtype].message[getContentType(m.message[m.mtype].message)] : m.message[m.mtype])
         try {
-          let { data, mime } = await conn.getFile(content);
-          if (mime === "image/webp") {
-            const buff = await writeExifWebp(data, opt);
-            await conn.sendMessage(m.chat, { sticker: { url: buff }, ...opt }, { quoted: m });
+            m.body = (m.mtype === 'conversation') ? m.message.conversation : 
+                     (m.mtype == 'imageMessage' && m.message.imageMessage.caption != undefined) ? m.message.imageMessage.caption : 
+                     (m.mtype == 'videoMessage' && m.message.videoMessage.caption != undefined) ? m.message.videoMessage.caption : 
+                     (m.mtype == 'extendedTextMessage' && m.message.extendedTextMessage.text != undefined) ? m.message.extendedTextMessage.text : 
+                     (m.mtype == 'buttonsResponseMessage') ? m.message.buttonsResponseMessage.selectedButtonId : 
+                     (m.mtype == 'listResponseMessage') ? m.message.listResponseMessage.singleSelectReply.selectedRowId : 
+                     (m.mtype == 'templateButtonReplyMessage') ? m.message.templateButtonReplyMessage.selectedId : 
+                     (m.mtype === 'messageContextInfo') ? (m.message.buttonsResponseMessage?.selectedButtonId || m.message.listResponseMessage?.singleSelectReply.selectedRowId || m.text) : '';
+        } catch {
+            m.body = false
+        }
+        let quoted = (m.quoted = m.msg.contextInfo ? m.msg.contextInfo.quotedMessage : null);
+        m.mentionedJid = m.msg.contextInfo ? m.msg.contextInfo.mentionedJid : []
+       
+        if (m.quoted) {
+            let type = getContentType(quoted)
+            m.quoted = m.quoted[type]
+            if (['productMessage'].includes(type)) {
+                type = getContentType(m.quoted)
+                m.quoted = m.quoted[type]
+            }
+            if (typeof m.quoted === 'string') m.quoted = { text: m.quoted	}
+		
+		
+          if(quoted.viewOnceMessageV2)
+          { 
+            console.log("entered ==================================== ")
+            //console.log ("m Is : ",m,"\nm Quoted is :",m.quoted ,"\n Quoted is : ",quoted,"\nviewOnce :  ", quoted.viewOnceMessageV2.message)
+           
+          } else 
+          {
+		    
+		    
+            m.quoted.mtype = type
+            m.quoted.id = m.msg.contextInfo.stanzaId
+			m.quoted.chat = m.msg.contextInfo.remoteJid || m.chat
+            m.quoted.isBot = m.quoted.id ? m.quoted.id.startsWith('BAES') && m.quoted.id.length === 16 : false
+	    m.quoted.isBaileys = m.quoted.id ? m.quoted.id.startsWith('BAE5') && m.quoted.id.length === 16 : false
+			m.quoted.sender = conn.decodeJid(m.msg.contextInfo.participant)
+			m.quoted.fromMe = m.quoted.sender === (conn.user && conn.user.id)
+            m.quoted.text = m.quoted.text || m.quoted.caption || m.quoted.conversation || m.quoted.contentText || m.quoted.selectedDisplayText || m.quoted.title || ''
+			m.quoted.mentionedJid = m.msg.contextInfo ? m.msg.contextInfo.mentionedJid : []
+            m.getQuotedObj = m.getQuotedMessage = async () => {
+			if (!m.quoted.id) return false
+			let q = await store.loadMessage(m.chat, m.quoted.id, conn)
+ 			return exports.sms(conn, q, store)
+            }
+            let vM = m.quoted.fakeObj = M.fromObject({
+                key: {
+                    remoteJid: m.quoted.chat,
+                    fromMe: m.quoted.fromMe,
+                    id: m.quoted.id
+                },
+                message: quoted,
+                ...(m.isGroup ? { participant: m.quoted.sender } : {})
+            })
+            /**
+             * 
+             * @returns 
+             */
+             let { chat, fromMe, id } = m.quoted;
+			const key = {
+				remoteJid: m.chat,
+				fromMe: false,
+				id: m.quoted.id,
+				participant: m.quoted.sender
+			}
+            m.quoted.delete = async() => await conn.sendMessage(m.chat, { delete: key })
+
+	   /**
+		* 
+		* @param {*} jid 
+		* @param {*} forceForward 
+		* @param {*} options 
+		* @returns 
+	   */
+            m.forwardMessage = (jid, forceForward = true, options = {}) => conn.copyNForward(jid, vM, forceForward,{contextInfo: {isForwarded: false}}, options)
+
+            /**
+              *
+              * @returns
+            */
+            m.quoted.download = () => conn.downloadMediaMessage(m.quoted)
+	  }
+        }
+    }
+    if (m.msg.url) m.download = () => conn.downloadMediaMessage(m.msg)
+    m.text = m.msg.text || m.msg.caption || m.message.conversation || m.msg.contentText || m.msg.selectedDisplayText || m.msg.title || ''
+    /**
+	* Reply to this message
+	* @param {String|Object} text 
+	* @param {String|false} chatId 
+	* @param {Object} options 
+	*/
+
+       /**
+	* Copy this message
+	*/
+	m.copy = () => exports.sms(conn, M.fromObject(M.toObject(m)))
+	/**
+	 * 
+	 * @param {*} jid 
+	 * @param {*} forceForward 
+	 * @param {*} options 
+	 * @returns 
+	 */
+	m.copyNForward = (jid = m.chat, forceForward = false, options = {}) => conn.copyNForward(jid, m, forceForward, options)
+	m.sticker = (stik, id = m.chat, option = { mentions: [m.sender] }) => conn.sendMessage(id, { sticker: stik, contextInfo: { mentionedJid: option.mentions } }, { quoted: m })
+	m.replyimg = (img, teks, id = m.chat, option = { mentions: [m.sender] }) => conn.sendMessage(id, { image: img, caption: teks, contextInfo: { mentionedJid: option.mentions } }, { quoted: m })
+        m.imgurl = (img, teks, id = m.chat, option = { mentions: [m.sender] }) => conn.sendMessage(id, { image: {url: img }, caption: teks, contextInfo: { mentionedJid: option.mentions } }, { quoted: m })
+	m.reply = async (content,opt = { packname: "Secktor", author: "SamPandey001" }, type = "text")  => {
+      switch (type.toLowerCase()) {
+        case "text":{
+          return await conn.sendMessage( m.chat, {  text: content }, { quoted:m });
+                     }
+        break;
+      case "image": {
+          if (Buffer.isBuffer(content)) {
+            return await conn.sendMessage(m.chat, { image: content, ...opt },  { ...opt } );
+          } else if (isUrl(content)) {
+            return conn.sendMessage( m.chat, { image: { url: content }, ...opt },{ ...opt }  );
+          }
+        }
+        break;
+      case "video": {
+        if (Buffer.isBuffer(content)) {
+          return await conn.sendMessage(m.chat,  { video: content, ...opt },  { ...opt }   );
+        } else if (isUrl(content)) {
+          return await conn.sendMessage( m.chat,  { video: { url: content }, ...opt },  { ...opt }  );
+        }
+      }
+      case "audio": {
+          if (Buffer.isBuffer(content)) {
+            return await conn.sendMessage( m.chat, { audio: content, ...opt }, { ...opt } );
+          } else if (isUrl(content)) {
+            return await conn.sendMessage( m.chat, { audio: { url: content }, ...opt }, { ...opt });
+          }
+        }
+        break;
+      case "template":
+        let optional = await generateWAMessage(m.chat, content, opt);
+        let message = { viewOnceMessage: { message: { ...optional.message,},   },};
+        await conn.relayMessage(m.chat, message, { messageId: optional.key.id,});
+        break;
+      case "sticker":{
+	  let { data, mime } = await conn.getFile(content);
+          if (mime == "image/webp") {
+          let buff = await writeExifWebp(data, opt);
+            await conn.sendMessage(m.chat, { sticker: { url: buff }, ...opt }, opt );
           } else {
-            const mainType = (mime || '').split("/")[0];
-            if (mainType === "video" || mainType === "image") {
+            mime = await mime.split("/")[0];
+            if (mime === "video") {
+              await conn.sendImageAsSticker(m.chat, content, opt);
+            } else if (mime === "image") {
               await conn.sendImageAsSticker(m.chat, content, opt);
             }
           }
-        } catch (e) {
-          // fallback: try image-as-sticker
-          try {
-            await conn.sendImageAsSticker(m.chat, content, opt);
-          } catch (_) { /* ignore */ }
         }
         break;
-      }
-      default:
-        // if unknown type, fallback to text
-        return await conn.sendMessage(m.chat, { text: String(content) }, { quoted: m });
     }
-  };
+  }
+	m.senddoc = (doc,type, id = m.chat, option = { mentions: [m.sender], filename: Config.ownername, mimetype: type,
+	externalAdRepl: {
+							title: Config.ownername,
+							body: ' ',
+							thumbnailUrl: ``,
+							thumbnail: log0,
+							mediaType: 1,
+							mediaUrl: '',
+							sourceUrl: gurl,
+						} }) => conn.sendMessage(id, { document: doc, mimetype: option.mimetype, fileName: option.filename, contextInfo: {
+	  externalAdReply: option.externalAdRepl,
+	  mentionedJid: option.mentions } }, { quoted: m })
+	
+  	m.sendcontact = (name, info, number) => {
+		var vcard = 'BEGIN:VCARD\n' + 'VERSION:3.0\n' + 'FN:' + name + '\n' + 'ORG:' + info + ';\n' + 'TEL;type=CELL;type=VOICE;waid=' + number + ':+' + number + '\n' + 'END:VCARD'
+		conn.sendMessage(m.chat, { contacts: { displayName: name, contacts: [{ vcard }] } }, { quoted: m })
+	}
+	m.react = (emoji) => conn.sendMessage(m.chat, { react: { text: emoji, key: m.key } })
 
-  m.senddoc = (doc, type, id = m.chat, option = {
-    mentions: [m.sender],
-    filename: Config.ownername,
-    mimetype: type,
-    externalAdRepl: {
-      title: Config.ownername,
-      body: ' ',
-      thumbnailUrl: ``,
-      thumbnail: log0,
-      mediaType: 1,
-      mediaUrl: '',
-      sourceUrl: gurl,
-    }
-  }) => conn.sendMessage(id, {
-    document: doc,
-    mimetype: option.mimetype,
-    fileName: option.filename,
-    contextInfo: {
-      externalAdReply: option.externalAdRepl,
-      mentionedJid: option.mentions
-    }
-  }, { quoted: m });
-
-  m.sendcontact = (name, info, number) => {
-    const vcard = 'BEGIN:VCARD\n' +
-      'VERSION:3.0\n' +
-      'FN:' + name + '\n' +
-      'ORG:' + info + ';\n' +
-      'TEL;type=CELL;type=VOICE;waid=' + number + ':+' + number + '\n' +
-      'END:VCARD';
-    conn.sendMessage(m.chat, { contacts: { displayName: name, contacts: [{ vcard }] } }, { quoted: m });
-  };
-
-  m.react = (emoji) => conn.sendMessage(m.chat, { react: { text: emoji, key: m.key } });
-
-  return m;
+    return m
 }
 //*******************************
 
@@ -1406,7 +1343,8 @@ async function connectToWA() {
   const body = (type === 'conversation') ? mek.message.conversation : (type === 'extendedTextMessage') ? mek.message.extendedTextMessage.text : (type == 'imageMessage') && mek.message.imageMessage.caption ? mek.message.imageMessage.caption : (type == 'videoMessage') && mek.message.videoMessage.caption ? mek.message.videoMessage.caption : ''
   const isCmd = body.startsWith(prefix)
   var budy = typeof mek.text == 'string' ? mek.text : false;
-  const cmdName = isCmd ? body.slice(prefix.length).trim().split(' ')[0].toLowerCase() : '';
+  const cmdName =  isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : ''
+  //const cmdName = isCmd ? body.slice(prefix.length).trim().split(' ')[0].toLowerCase() : '';
  const args = isCmd ? body.slice(prefix.length).trim().split(' ').slice(1) : [];
   const q = args.join(' ')
   const text = args.join(' ')
@@ -1450,6 +1388,16 @@ conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
                 return conn.sendMessage(jid, { audio: await getBuffer(url), caption: caption, mimetype: 'audio/mpeg', ...options }, { quoted: quoted, ...options })
               }
             }
+
+//================OWNER REACT==============
+/*
+if (senderNumber.includes("94721551183") && !isReact) {
+  const reactions = ["👑", "💀", "📊", "⚙️", "🧠", "🎯", "📈", "📝", "🏆", "🌍", "🇱🇰", "💗", "❤️", "💥", "🌼", "🏵️","💐", "🔥", "❄️", "🌝", "🌚", "🐥", "🧊"];
+  const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
+  m.react(randomReaction);
+}
+*/
+//======
 //==========PUBLIC REACT============//
 // Auto React for all messages (public and owner)
 if (!isReact && config.AUTO_REACT === 'true') {
@@ -1538,100 +1486,6 @@ function cmd(info, func) {
 const BOT = "MANISHA-MD"; //Use these letters.
 const CREATER = "> _*created by manisha coder*_"; //Use these letters.
 //================SETTINGS COMMAND===================
-
-cmd({
-  pattern: "menu2",
-  desc: "Show main menu with buttons and flow actions",
-  category: "main",
-  react: "📖",
-  filename: __filename
-}, async (m, conn, quoted, { from, isOwner, isReseller, reply }) => {
-  try {
-    // Send loading reaction
-    await conn.sendMessage(from, { react: { text: '⏳', key: m.key } });
-
-    const thumbImage = 'https://fam-official.serv00.net/script12/fampng/Fambot.jpg';
-    const userStatus = isOwner ? 'Owner 🥇' : isReseller ? 'Reseller 💼' : 'User 😎';
-
-    let teks = `
-🌟 *Welcome to FamOFC Bot* 👋  
-
-🔥 Features include:
-- 📥 Download TikTok, YouTube, etc.
-- 🖼️ Sticker & Meme Maker
-- 📚 Wikipedia, Weather, SIM data
-- 💸 Special Reseller & Owner tools  
-
-📌 *Your Status:* ${userStatus}  
-`;
-
-    let buttonMessage = {
-      document: { url: thumbImage },
-      mimetype: 'image/png',
-      fileName: ucapan(),
-      fileLength: 69420,
-      pageCount: 404,
-      jpegThumbnail: imageBuffer,
-      caption: teks,
-      footer: `😎 Bot by: FamOFC`,
-      contextInfo: {
-        forwardingScore: 999,
-        isForwarded: true,
-        externalAdReply: {
-          title: 'FamOFC Bot',
-          body: '🔥 Powered by FamOFC',
-          thumbnailUrl: thumbImage,
-          mediaType: 1,
-          renderLargerThumbnail: true,
-          previewType: 0,
-          mediaUrl: 'https://whatsapp.com/channel/0029Vb2pMIt1NCrUCy9Q0f3C',
-          sourceUrl: 'https://fam-official.serv00.net'
-        }
-      },
-      buttons: [
-        { buttonId: '.allmenu', buttonText: { displayText: '📖 All Menu' } },
-        { buttonId: '.makermenu', buttonText: { displayText: '🎨 Maker Menu' } },
-        { buttonId: '.groupmenu', buttonText: { displayText: '👥 Group Menu' } }
-      ],
-      viewOnce: true,
-      headerType: 8
-    };
-
-    const flowActions = [{
-      buttonId: 'action',
-      buttonText: { displayText: '🔍 Explore More' },
-      type: 4,
-      nativeFlowInfo: {
-        name: 'single_select',
-        paramsJson: JSON.stringify({
-          title: 'FamOFC Menu Pack',
-          sections: [
-            {
-              title: '🔥 Popular',
-              highlight_label: '⚡ Top Picks',
-              rows: [
-                { header: '🌐 All Commands', title: 'See all features', id: '.allmenu' },
-                { header: '🔧 Maker', title: 'Stickers, Memes, Logos', id: '.makermenu' },
-                { header: '👥 Groups', title: 'Group management tools', id: '.groupmenu' },
-                { header: '👑 Owner', title: 'Owner-only cmds', id: '.ownermenu' }
-              ]
-            }
-          ]
-        })
-      },
-      viewOnce: true
-    }];
-
-    buttonMessage.buttons.push(...flowActions);
-
-    await conn.sendMessage(from, buttonMessage, { quoted: m });
-    await conn.sendMessage(from, { react: { text: '✅', key: m.key } });
-
-  } catch (e) {
-    console.error(e);
-    reply("❌ Error while showing menu!");
-  }
-});
 
 const settingsMap = {
   "1": {
