@@ -1539,17 +1539,16 @@ const BOT = "MANISHA-MD"; //Use these letters.
 const CREATER = "> _*created by manisha coder*_"; //Use these letters.
 //================SETTINGS COMMAND===================
 
-// Menu Command with Buttons + Flow
 cmd({
   pattern: "menu2",
   desc: "Show main menu with buttons and flow actions",
   category: "main",
   react: "📖",
   filename: __filename
-}, async (m, sock, quoted, { from, isOwner, isReseller, reply }) => {
+}, async (m, conn, quoted, { from, isOwner, isReseller, reply }) => {
   try {
     // Send loading reaction
-    await sock.sendMessage(from, { react: { text: '⏳', key: m.key } });
+    await conn.sendMessage(from, { react: { text: '⏳', key: m.key } });
 
     const thumbImage = 'https://fam-official.serv00.net/script12/fampng/Fambot.jpg';
     const userStatus = isOwner ? 'Owner 🥇' : isReseller ? 'Reseller 💼' : 'User 😎';
@@ -1566,7 +1565,6 @@ cmd({
 📌 *Your Status:* ${userStatus}  
 `;
 
-    // Base Button Message
     let buttonMessage = {
       document: { url: thumbImage },
       mimetype: 'image/png',
@@ -1591,24 +1589,14 @@ cmd({
         }
       },
       buttons: [
-        {
-          buttonId: '.allmenu',
-          buttonText: { displayText: '📖 All Menu' }
-        },
-        {
-          buttonId: '.makermenu',
-          buttonText: { displayText: '🎨 Maker Menu' }
-        },
-        {
-          buttonId: '.groupmenu',
-          buttonText: { displayText: '👥 Group Menu' }
-        }
+        { buttonId: '.allmenu', buttonText: { displayText: '📖 All Menu' } },
+        { buttonId: '.makermenu', buttonText: { displayText: '🎨 Maker Menu' } },
+        { buttonId: '.groupmenu', buttonText: { displayText: '👥 Group Menu' } }
       ],
       viewOnce: true,
       headerType: 8
     };
 
-    // Flow Actions
     const flowActions = [{
       buttonId: 'action',
       buttonText: { displayText: '🔍 Explore More' },
@@ -1634,14 +1622,10 @@ cmd({
       viewOnce: true
     }];
 
-    // Merge Flow Actions
     buttonMessage.buttons.push(...flowActions);
 
-    // Send Menu
-    await sock.sendMessage(from, buttonMessage, { quoted: m });
-
-    // Success reaction
-    await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
+    await conn.sendMessage(from, buttonMessage, { quoted: m });
+    await conn.sendMessage(from, { react: { text: '✅', key: m.key } });
 
   } catch (e) {
     console.error(e);
